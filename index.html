@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Downtime Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="light-mode">
+    <div class="container">
+        <header>
+            <div class="logo-section">
+                <div class="logo-box">E</div>
+                <h1>DOWNTIME TRACKER</h1>
+            </div>
+            <button id="theme-toggle" class="icon-btn">
+                <span id="theme-icon">🌙</span>
+            </button>
+        </header>
+
+        <main>
+            <section class="timer-section card">
+                <div class="timer-display">00:00:00</div>
+
+                <div class="reason-container">
+                    <label for="downtime-reason">REASON DOWNTIME OCCURRED</label>
+                    <select id="downtime-reason">
+                        <option value="Forklift">Forklift</option>
+                        <option value="Machine">Machine</option>
+                        <option value="No Orders">No Orders</option>
+                        <option value="Asked To Wait">Asked To Wait</option>
+                        <option value="custom">Custom Reason (user entry form)</option>
+                    </select>
+                </div>
+
+                <button id="punch-btn" class="punch-btn">
+                    <div class="logo-box-small">E</div>
+                    <span id="punch-text">START TIMER</span>
+                </button>
+            </section>
+
+            <section class="stats-section">
+                <h2>
+                    <span class="icon">📊</span>
+                    Database Statistics Dashboard
+                </h2>
+                <div class="stats-grid">
+                    <div class="stat-card blue">
+                        <div class="stat-label">TOTAL RECORDS</div>
+                        <div class="stat-value" id="total-records">0</div>
+                        <span class="stat-icon">📋</span>
+                    </div>
+                    <div class="stat-card green">
+                        <div class="stat-label">TOTAL DOWNTIME</div>
+                        <div class="stat-value" id="total-downtime">0h 0m</div>
+                        <span class="stat-icon">🕒</span>
+                    </div>
+                    <div class="stat-card purple">
+                        <div class="stat-label">DATABASE STATUS</div>
+                        <div class="stat-value" id="db-status">Healthy</div>
+                        <span class="stat-icon">✅</span>
+                    </div>
+                    <div class="stat-card orange">
+                        <div class="stat-label">LAST ACTIVITY</div>
+                        <div class="stat-value" id="last-activity">Never</div>
+                        <span class="stat-icon">🔄</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="management-section">
+                <h2>Database Management</h2>
+                <div class="management-card card">
+                    <div class="btn-group">
+                        <button id="export-csv" class="btn green">EXPORT TO CSV</button>
+                        <button id="export-md" class="btn blue">EXPORT TO MARKDOWN</button>
+                        <button id="export-html" class="btn orange">EXPORT TO HTML</button>
+                    </div>
+                    <button id="clear-db" class="btn red">DELETE DATABASE</button>
+                </div>
+            </section>
+
+            <section class="history-section">
+                <h2>Record Management</h2>
+                <div class="history-card card">
+                    <div class="filter-bar">
+                        <input type="text" id="search-records" placeholder="Search records...">
+                        <select id="sort-order">
+                            <option value="newest">Newest First</option>
+                            <option value="oldest">Oldest First</option>
+                        </select>
+                        <button id="clear-search" class="btn-secondary">CLEAR</button>
+                    </div>
+
+                    <div id="records-list" class="records-list">
+                        <!-- Records will be injected here -->
+                    </div>
+
+                    <div class="batch-actions">
+                        <label class="checkbox-container">
+                            <input type="checkbox" id="select-all">
+                            <span class="checkmark"></span>
+                            Select All (<span id="selected-count">0</span> selected)
+                        </label>
+                        <div class="btn-group">
+                            <button id="delete-selected" class="btn red">DELETE SELECTED</button>
+                            <button id="export-selected" class="btn green">EXPORT SELECTED</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Custom Reason Modal -->
+    <div id="custom-reason-modal" class="modal">
+        <div class="modal-content">
+            <h3>Enter Custom Reason</h3>
+            <input type="text" id="custom-reason-input" placeholder="Enter reason here...">
+            <div class="modal-buttons">
+                <button id="cancel-custom" class="btn-secondary">Cancel</button>
+                <button id="save-custom" class="btn blue">Save Reason</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
