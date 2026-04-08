@@ -1,10 +1,22 @@
 // app.js
 
 const DB_NAME = 'DowntimeTrackerDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Increment version for new store
 const STORE_NAME = 'records';
+const SETTINGS_STORE = 'settings';
+const REASONS_STORE = 'custom_reasons';
 
 let db;
+
+// Request persistent storage
+async function requestPersistence() {
+    if (navigator.storage && navigator.storage.persist) {
+        const isPersisted = await navigator.storage.persist();
+        console.log(`Persisted storage granted: ${isPersisted}`);
+        return isPersisted;
+    }
+    return false;
+}
 
 // Initialize IndexedDB
 function initDB() {
@@ -21,6 +33,7 @@ function initDB() {
             db = event.target.result;
             console.log('Database opened successfully');
             updateDBStatus('Healthy');
+            requestPersistence();
             resolve(db);
         };
 
@@ -28,6 +41,12 @@ function initDB() {
             const db = event.target.result;
             if (!db.objectStoreNames.contains(STORE_NAME)) {
                 db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+            }
+            if (!db.objectStoreNames.contains(SETTINGS_STORE)) {
+                db.createObjectStore(SETTINGS_STORE);
+            }
+            if (!db.objectStoreNames.contains(REASONS_STORE)) {
+                db.createObjectStore(REASONS_STORE, { keyPath: 'name' });
             }
         };
     });
@@ -48,6 +67,27 @@ async function addRecord(record) {
         const store = transaction.objectStore(STORE_NAME);
         const request = store.add(record);
 
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+async function addCustomReason(reason) {
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([REASONS_STORE], 'readwrite');
+        const store = transaction.objectStore(REASONS_STORE);
+        const request = store.put({ name: reason });
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+}
+
+async function getAllCustomReasons() {
+    return new Promise((resolve, reject) => {
+        if (!db) return resolve([]);
+        const transaction = db.transaction([REASONS_STORE], 'readonly');
+        const store = transaction.objectStore(REASONS_STORE);
+        const request = store.getAll();
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
     });
@@ -81,11 +121,33 @@ async function deleteRecord(id) {
 
 async function clearDatabase() {
     return new Promise((resolve, reject) => {
-        const transaction = db.transaction([STORE_NAME], 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
-        const request = store.clear();
+        const transaction = db.transaction([STORE_NAME, SETTINGS_STORE, REASONS_STORE], 'readwrite');
+        transaction.objectStore(STORE_NAME).clear();
+        transaction.objectStore(SETTINGS_STORE).clear();
+        transaction.objectStore(REASONS_STORE).clear();
 
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+    });
+}
+
+async function setSetting(key, value) {
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([SETTINGS_STORE], 'readwrite');
+        const store = transaction.objectStore(SETTINGS_STORE);
+        const request = store.put(value, key);
         request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+}
+
+async function getSetting(key) {
+    return new Promise((resolve, reject) => {
+        if (!db) return resolve(null);
+        const transaction = db.transaction([SETTINGS_STORE], 'readonly');
+        const store = transaction.objectStore(SETTINGS_STORE);
+        const request = store.get(key);
+        request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
     });
 }
@@ -107,12 +169,13 @@ const saveCustomBtn = document.getElementById('save-custom');
 const cancelCustomBtn = document.getElementById('cancel-custom');
 
 // Timer Functions
-function startTimer() {
+async function startTimer() {
     startTime = Date.now();
     isRunning = true;
     punchBtn.classList.add('active');
     punchText.textContent = 'STOP TIMER';
 
+    await saveTimerState();
     timerInterval = setInterval(updateTimerDisplay, 1000);
 }
 
@@ -136,8 +199,36 @@ async function stopTimer() {
     punchText.textContent = 'START TIMER';
     timerDisplay.textContent = '00:00:00';
 
+    await clearTimerState();
     await updateDashboard();
     await renderRecords();
+}
+
+async function saveTimerState() {
+    await setSetting('timerState', {
+        startTime,
+        isRunning,
+        currentReason
+    });
+}
+
+async function clearTimerState() {
+    await setSetting('timerState', null);
+}
+
+async function restoreTimerState() {
+    const state = await getSetting('timerState');
+    if (state && state.isRunning) {
+        startTime = state.startTime;
+        isRunning = state.isRunning;
+        currentReason = state.currentReason;
+        reasonSelect.value = currentReason;
+
+        punchBtn.classList.add('active');
+        punchText.textContent = 'STOP TIMER';
+        timerInterval = setInterval(updateTimerDisplay, 1000);
+        updateTimerDisplay();
+    }
 }
 
 function updateTimerDisplay() {
@@ -169,20 +260,32 @@ reasonSelect.addEventListener('change', (e) => {
     }
 });
 
-saveCustomBtn.addEventListener('click', () => {
+saveCustomBtn.addEventListener('click', async () => {
     const customReason = customReasonInput.value.trim();
     if (customReason) {
-        // Add to select as a temporary option
-        const option = document.createElement('option');
-        option.value = customReason;
-        option.textContent = customReason;
-        reasonSelect.insertBefore(option, reasonSelect.lastElementChild);
+        await addCustomReason(customReason);
+        addReasonToDropdown(customReason);
         reasonSelect.value = customReason;
         currentReason = customReason;
         customReasonModal.style.display = 'none';
         customReasonInput.value = '';
     }
 });
+
+function addReasonToDropdown(reason) {
+    // Check if it already exists
+    if (Array.from(reasonSelect.options).some(opt => opt.value === reason)) return;
+
+    const option = document.createElement('option');
+    option.value = reason;
+    option.textContent = reason;
+    reasonSelect.insertBefore(option, reasonSelect.lastElementChild);
+}
+
+async function loadCustomReasons() {
+    const reasons = await getAllCustomReasons();
+    reasons.forEach(r => addReasonToDropdown(r.name));
+}
 
 cancelCustomBtn.addEventListener('click', () => {
     customReasonModal.style.display = 'none';
@@ -192,6 +295,8 @@ cancelCustomBtn.addEventListener('click', () => {
 // App Initialization
 document.addEventListener('DOMContentLoaded', async () => {
     await initDB();
+    await loadCustomReasons();
+    await restoreTimerState();
     await updateDashboard();
     await renderRecords();
 });
@@ -343,6 +448,9 @@ const exportCSVBtn = document.getElementById('export-csv');
 const exportMDBtn = document.getElementById('export-md');
 const exportHTMLBtn = document.getElementById('export-html');
 const clearDBBtn = document.getElementById('clear-db');
+const backupDBBtn = document.getElementById('backup-db');
+const restoreDBBtn = document.getElementById('restore-db');
+const restoreInput = document.getElementById('restore-input');
 const deleteSelectedBtn = document.getElementById('delete-selected');
 const exportSelectedBtn = document.getElementById('export-selected');
 const themeToggle = document.getElementById('theme-toggle');
@@ -424,6 +532,60 @@ function generateHTML(records) {
     return html;
 }
 
+async function backupDatabase() {
+    const records = await getAllRecords();
+    const reasons = await getAllCustomReasons();
+    const data = {
+        records,
+        reasons,
+        exportDate: new Date().toISOString(),
+        version: DB_VERSION
+    };
+    downloadFile(JSON.stringify(data, null, 2), `downtime_backup_${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
+}
+
+async function restoreDatabase(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (!data.records || !data.reasons) {
+                throw new Error('Invalid backup file format');
+            }
+
+            if (confirm(`Restore ${data.records.length} records and ${data.reasons.length} custom reasons? This will append to your current database.`)) {
+                const recordTransaction = db.transaction([STORE_NAME], 'readwrite');
+                const recordStore = recordTransaction.objectStore(STORE_NAME);
+                data.records.forEach(r => {
+                    delete r.id; // Let auto-increment handle it
+                    recordStore.add(r);
+                });
+
+                const reasonTransaction = db.transaction([REASONS_STORE], 'readwrite');
+                const reasonStore = reasonTransaction.objectStore(REASONS_STORE);
+                data.reasons.forEach(r => {
+                    reasonStore.put(r);
+                });
+
+                await Promise.all([
+                    new Promise(r => recordTransaction.oncomplete = r),
+                    new Promise(r => reasonTransaction.oncomplete = r)
+                ]);
+
+                alert('Database restored successfully!');
+                location.reload(); // Easiest way to refresh all UI
+            }
+        } catch (err) {
+            console.error('Restore error:', err);
+            alert('Failed to restore database: ' + err.message);
+        }
+    };
+    reader.readAsText(file);
+}
+
 // Event Listeners for Export
 exportCSVBtn.addEventListener('click', () => {
     if (allRecords.length === 0) return alert('No records to export');
@@ -448,6 +610,10 @@ exportSelectedBtn.addEventListener('click', () => {
 });
 
 // Management Event Listeners
+backupDBBtn.addEventListener('click', backupDatabase);
+restoreDBBtn.addEventListener('click', () => restoreInput.click());
+restoreInput.addEventListener('change', restoreDatabase);
+
 clearDBBtn.addEventListener('click', async () => {
     if (confirm('CRITICAL: Are you sure you want to delete the entire database? This cannot be undone.')) {
         await clearDatabase();

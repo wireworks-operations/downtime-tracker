@@ -76,7 +76,12 @@
                         <button id="export-md" class="btn blue">EXPORT TO MARKDOWN</button>
                         <button id="export-html" class="btn orange">EXPORT TO HTML</button>
                     </div>
-                    <button id="clear-db" class="btn red">DELETE DATABASE</button>
+                    <div class="btn-group" style="margin-top: 10px;">
+                        <button id="backup-db" class="btn purple">BACKUP DATABASE (JSON)</button>
+                        <button id="restore-db" class="btn purple">RESTORE FROM BACKUP</button>
+                        <input type="file" id="restore-input" style="display: none;" accept=".json">
+                    </div>
+                    <button id="clear-db" class="btn red" style="margin-top: 10px;">DELETE DATABASE</button>
                 </div>
             </section>
 
