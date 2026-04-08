@@ -365,9 +365,20 @@ function downloadFile(content, fileName, contentType) {
     URL.revokeObjectURL(a.href);
 }
 
+function escapeHTML(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+function escapeCSV(str) {
+    if (typeof str !== 'string') return str;
+    return str.replace(/"/g, '""');
+}
+
 function generateCSV(records) {
     const header = 'ID,Reason,Start Time,End Time,Duration (s),Timestamp\n';
-    const rows = records.map(r => `${r.id},"${r.reason}",${r.startTime},${r.endTime},${r.duration},"${r.timestamp}"`).join('\n');
+    const rows = records.map(r => `${r.id},"${escapeCSV(r.reason)}",${r.startTime},${r.endTime},${r.duration},"${r.timestamp}"`).join('\n');
     return header + rows;
 }
 
@@ -376,7 +387,9 @@ function generateMD(records) {
     md += '| ID | Reason | Duration | Timestamp |\n';
     md += '|---|---|---|---|\n';
     records.forEach(r => {
-        md += `| ${r.id} | ${r.reason} | ${formatDuration(r.duration)} | ${r.timestamp} |\n`;
+        // MD pipes need escaping if they are in the reason
+        const escapedReason = r.reason.replace(/\|/g, '\\|');
+        md += `| ${r.id} | ${escapedReason} | ${formatDuration(r.duration)} | ${r.timestamp} |\n`;
     });
     return md;
 }
@@ -384,25 +397,30 @@ function generateMD(records) {
 function generateHTML(records) {
     let html = `
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
+        <meta charset="UTF-8">
         <title>Downtime Records</title>
         <style>
-            table { border-collapse: collapse; width: 100%; }
+            table { border-collapse: collapse; width: 100%; font-family: sans-serif; }
             th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
             th { background-color: #f2f2f2; }
+            h1 { font-family: sans-serif; }
         </style>
     </head>
     <body>
         <h1>Downtime Tracker Records</h1>
         <table>
-            <tr><th>Reason</th><th>Duration</th><th>Timestamp</th></tr>`;
+            <thead>
+                <tr><th>Reason</th><th>Duration</th><th>Timestamp</th></tr>
+            </thead>
+            <tbody>`;
 
     records.forEach(r => {
-        html += `<tr><td>${r.reason}</td><td>${formatDuration(r.duration)}</td><td>${r.timestamp}</td></tr>`;
+        html += `<tr><td>${escapeHTML(r.reason)}</td><td>${formatDuration(r.duration)}</td><td>${r.timestamp}</td></tr>`;
     });
 
-    html += `</table></body></html>`;
+    html += `</tbody></table></body></html>`;
     return html;
 }
 
