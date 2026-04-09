@@ -418,7 +418,7 @@ async function handleDeleteRecord(id) {
 }
 
 // Filter Event Listeners
-searchInput.addEventListener('input', applyFilters);
+searchInput.addEventListener('input', debounce(applyFilters, 250));
 sortSelect.addEventListener('change', applyFilters);
 clearSearchBtn.addEventListener('click', () => {
     searchInput.value = '';
@@ -643,6 +643,20 @@ themeToggle.addEventListener('click', () => {
     const isDarkMode = document.body.classList.contains('dark-mode');
     themeIcon.textContent = isDarkMode ? '☀️' : '🌙';
 });
+
+/**
+ * Simple debounce utility to limit the rate of function execution.
+ * @param {Function} func - The function to debounce.
+ * @param {number} delay - The delay in milliseconds.
+ * @returns {Function} - The debounced function.
+ */
+function debounce(func, delay) {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), delay);
+    };
+}
 
 // Make handleDeleteRecord global for onclick
 window.handleDeleteRecord = handleDeleteRecord;
